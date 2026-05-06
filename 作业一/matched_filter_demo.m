@@ -52,6 +52,7 @@ t2  = B * t1(idx);
 plot(t2, Z(idx), 'b', t2, Z1(idx), 'r--');
 axis([-inf, inf, -50, inf]);
 set(gca, 'YTick', [-13.4, -4, 0], 'XTick', [-3, -2, -1, -0.5, 0, 0.5, 1, 2, 3]);
+% -13.4 dB: first sidelobe level of sinc; -4 dB: 3dB width marker (t = ±1/(2B))
 grid on;
 legend('仿真结果', 'sinc理论值');
 xlabel('归一化时间  t \times B');

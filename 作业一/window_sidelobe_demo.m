@@ -36,11 +36,11 @@ Srw  = fft(Srt, Nfft);
 
 %% 各窗函数定义
 window_list = {
-    'Rectangular（矩形窗）',  ones(1, Nchirp);
-    'Hamming',               hamming(Nchirp)';
-    'Hanning',               hanning(Nchirp)';
-    'Kaiser (β=6)',          kaiser(Nchirp, 6)';
-    'Chebyshev (60dB)',      chebwin(Nchirp, 60)';
+    'Rectangular',      ones(1, Nchirp);
+    'Hamming',          hamming(Nchirp)';
+    'Hanning',          hanning(Nchirp)';
+    'Kaiser (beta=6)',  kaiser(Nchirp, 6)';
+    'Chebyshev (60dB)', chebwin(Nchirp, 60)';
 };
 nWin = size(window_list, 1);
 
@@ -105,10 +105,12 @@ hold off;
 
 %% 打印性能指标汇总表
 fprintf('\n===== 窗函数对脉压旁瓣的影响 =====\n');
-fprintf('%-26s  %s\n', '窗函数', '峰值旁瓣电平 (dB)');
-fprintf('%s\n', repmat('-', 1, 50));
+max_name_len = max(cellfun(@length, window_list(:, 1)));
+fmt = sprintf('%%-%ds  %%s\\n', max_name_len);
+fprintf(fmt, '窗函数', '峰值旁瓣电平 (dB)');
+fprintf('%s\n', repmat('-', 1, max_name_len + 24));
 for k = 1:nWin
-    fprintf('%-26s  %.1f dB\n', window_list{k, 1}, peak_sidelobe_dB(k));
+    fprintf(fmt, window_list{k, 1}, sprintf('%.1f dB', peak_sidelobe_dB(k)));
 end
 
 %% 单点目标对比：主瓣展宽 vs 旁瓣抑制
@@ -141,9 +143,13 @@ grid on;
 hold off;
 
 fprintf('\n===== 结论 =====\n');
-fprintf('1. 矩形窗：主瓣最窄（最优距离分辨率），旁瓣最高（约-13.4dB）\n');
-fprintf('2. Hamming窗：旁瓣约-43dB，主瓣展宽约1.5倍\n');
-fprintf('3. Hanning窗：旁瓣约-32dB，主瓣展宽约1.6倍\n');
-fprintf('4. Kaiser窗 (β=6)：旁瓣约-44dB，可通过β参数灵活调节旁瓣/分辨率折中\n');
-fprintf('5. Chebyshev窗：各旁瓣等幅（-60dB），主瓣展宽最大\n');
+fprintf('以下为各窗函数的实测峰值旁瓣电平（相对主瓣，dB）：\n');
+for k = 1:nWin
+    fprintf('  %-20s  %.1f dB\n', window_list{k, 1}, peak_sidelobe_dB(k));
+end
+fprintf('\n说明：\n');
+fprintf('  矩形窗：主瓣最窄（最优距离分辨率），旁瓣最高（约-13.4dB）\n');
+fprintf('  Hamming/Hanning窗：旁瓣得到明显抑制，主瓣有所展宽\n');
+fprintf('  Kaiser窗：可通过β参数灵活调节旁瓣抑制与主瓣展宽的折中\n');
+fprintf('  Chebyshev窗：各旁瓣等幅，旁瓣最低，但主瓣展宽最大\n');
 fprintf('\n距离分辨率（σ_R = C/(2B) = %.1f m）\n', C/(2*B));
