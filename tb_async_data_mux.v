@@ -11,12 +11,16 @@ module tb_async_data_mux;
 
     wire data_out;
     wire [1:0] frame_type;
+    wire overflow_a;
+    wire overflow_b;
 
     reg [31:0] out_shift;
     integer out_bit_cnt;
     integer out_a_cnt;
     integer out_b_cnt;
     integer out_idle_cnt;
+    integer sum_a_payload;
+    integer sum_b_payload;
 
     async_data_mux dut (
         .rst_n(rst_n),
@@ -26,7 +30,9 @@ module tb_async_data_mux;
         .data_b(data_b),
         .clk_out(clk_out),
         .data_out(data_out),
-        .frame_type(frame_type)
+        .frame_type(frame_type),
+        .overflow_a(overflow_a),
+        .overflow_b(overflow_b)
     );
 
     always #16.666 clk_a = ~clk_a;   // 30 MHz
@@ -60,12 +66,20 @@ module tb_async_data_mux;
             out_a_cnt   <= 0;
             out_b_cnt   <= 0;
             out_idle_cnt <= 0;
+            sum_a_payload <= 0;
+            sum_b_payload <= 0;
         end else begin
             out_shift <= {out_shift[30:0], data_out};
             if (out_bit_cnt == 31) begin
-                if ({out_shift[30:0], data_out}[31:24] == 8'hAA) out_a_cnt <= out_a_cnt + 1;
-                else if ({out_shift[30:0], data_out}[31:24] == 8'hCC) out_b_cnt <= out_b_cnt + 1;
-                else if ({out_shift[30:0], data_out}[31:24] == 8'hEE) out_idle_cnt <= out_idle_cnt + 1;
+                if ({out_shift[30:0], data_out}[31:24] == 8'hAA) begin
+                    out_a_cnt <= out_a_cnt + 1;
+                    sum_a_payload <= sum_a_payload + {out_shift[30:0], data_out}[23:0];
+                end else if ({out_shift[30:0], data_out}[31:24] == 8'hCC) begin
+                    out_b_cnt <= out_b_cnt + 1;
+                    sum_b_payload <= sum_b_payload + {out_shift[30:0], data_out}[23:0];
+                end else if ({out_shift[30:0], data_out}[31:24] == 8'hEE) begin
+                    out_idle_cnt <= out_idle_cnt + 1;
+                end
                 out_bit_cnt <= 0;
             end else begin
                 out_bit_cnt <= out_bit_cnt + 1;
@@ -106,8 +120,16 @@ module tb_async_data_mux;
         #20000;
 
         $display("Output frames: A=%0d, B=%0d, IDLE=%0d", out_a_cnt, out_b_cnt, out_idle_cnt);
-        if (out_a_cnt < 6 || out_b_cnt < 10) begin
+        if (out_a_cnt != 6 || out_b_cnt != 10 || out_idle_cnt == 0) begin
             $display("TEST FAILED: frame loss detected");
+            $finish_and_return(1);
+        end
+        if (sum_a_payload != 32'h017D_D52A || sum_b_payload != 32'h0499_DB5A) begin
+            $display("TEST FAILED: payload mismatch");
+            $finish_and_return(1);
+        end
+        if (overflow_a || overflow_b) begin
+            $display("TEST FAILED: input fifo overflow");
             $finish_and_return(1);
         end
 

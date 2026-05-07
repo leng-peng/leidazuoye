@@ -35,6 +35,7 @@ module async_fifo #(
     assign rptr_bin_next  = rptr_bin + ((rd_en && !empty) ? 1'b1 : 1'b0);
     assign rptr_gray_next = (rptr_bin_next >> 1) ^ rptr_bin_next;
 
+    // full when write pointer (next) is one wrap-ahead of synchronized read pointer in Gray code
     assign full  = (wptr_gray_next == {~rptr_gray_sync2[ADDR_WIDTH:ADDR_WIDTH-1], rptr_gray_sync2[ADDR_WIDTH-2:0]});
     assign empty = (rptr_gray == wptr_gray_sync2);
 

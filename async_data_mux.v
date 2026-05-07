@@ -6,11 +6,13 @@ module async_data_mux (
     input  wire data_b,
     input  wire clk_out,
     output reg  data_out,
-    output reg [1:0] frame_type
+    output reg [1:0] frame_type,
+    output reg  overflow_a,
+    output reg  overflow_b
 );
 
-    localparam [7:0] SYNC_A = 8'b10101010;
-    localparam [7:0] SYNC_B = 8'b11001100;
+    localparam [7:0] SYNC_A = 8'hAA;
+    localparam [7:0] SYNC_B = 8'hCC;
     localparam [31:0] IDLE_FRAME = {8'b11101110, 24'h000000};
 
     reg [31:0] shift_a;
@@ -32,18 +34,24 @@ module async_data_mux (
 
     reg [31:0] tx_shift;
     reg [5:0]  tx_bit_cnt;
+    reg        last_sel;
 
     always @(posedge clk_a or negedge rst_n) begin
         if (!rst_n) begin
             shift_a  <= 32'd0;
             wr_data_a <= 32'd0;
             wr_en_a  <= 1'b0;
+            overflow_a <= 1'b0;
         end else begin
             shift_a <= {shift_a[30:0], data_a};
             wr_en_a <= 1'b0;
-            if ({shift_a[30:0], data_a}[31:24] == SYNC_A && !fifo_a_full) begin
-                wr_data_a <= {shift_a[30:0], data_a};
-                wr_en_a   <= 1'b1;
+            if ({shift_a[30:0], data_a}[31:24] == SYNC_A) begin
+                if (!fifo_a_full) begin
+                    wr_data_a <= {shift_a[30:0], data_a};
+                    wr_en_a   <= 1'b1;
+                end else begin
+                    overflow_a <= 1'b1;
+                end
             end
         end
     end
@@ -53,12 +61,17 @@ module async_data_mux (
             shift_b  <= 32'd0;
             wr_data_b <= 32'd0;
             wr_en_b  <= 1'b0;
+            overflow_b <= 1'b0;
         end else begin
             shift_b <= {shift_b[30:0], data_b};
             wr_en_b <= 1'b0;
-            if ({shift_b[30:0], data_b}[31:24] == SYNC_B && !fifo_b_full) begin
-                wr_data_b <= {shift_b[30:0], data_b};
-                wr_en_b   <= 1'b1;
+            if ({shift_b[30:0], data_b}[31:24] == SYNC_B) begin
+                if (!fifo_b_full) begin
+                    wr_data_b <= {shift_b[30:0], data_b};
+                    wr_en_b   <= 1'b1;
+                end else begin
+                    overflow_b <= 1'b1;
+                end
             end
         end
     end
@@ -91,32 +104,49 @@ module async_data_mux (
         if (!rst_n) begin
             rd_en_a   <= 1'b0;
             rd_en_b   <= 1'b0;
-            tx_shift  <= IDLE_FRAME;
+            tx_shift  <= {IDLE_FRAME[30:0], 1'b0};
             tx_bit_cnt <= 6'd0;
             data_out  <= 1'b0;
             frame_type <= 2'd0;
+            last_sel  <= 1'b0;
         end else begin
             rd_en_a <= 1'b0;
             rd_en_b <= 1'b0;
             if (tx_bit_cnt == 6'd0) begin
-                if (!fifo_a_empty) begin
+                if (!fifo_a_empty && !fifo_b_empty) begin
+                    if (last_sel) begin
+                        rd_en_a    <= 1'b1;
+                        tx_shift   <= {fifo_a_dout[30:0], 1'b0};
+                        data_out   <= fifo_a_dout[31];
+                        frame_type <= 2'd1;
+                        last_sel   <= 1'b0;
+                    end else begin
+                        rd_en_b    <= 1'b1;
+                        tx_shift   <= {fifo_b_dout[30:0], 1'b0};
+                        data_out   <= fifo_b_dout[31];
+                        frame_type <= 2'd2;
+                        last_sel   <= 1'b1;
+                    end
+                end else if (!fifo_a_empty) begin
                     rd_en_a    <= 1'b1;
-                    tx_shift   <= fifo_a_dout;
+                    tx_shift   <= {fifo_a_dout[30:0], 1'b0};
                     data_out   <= fifo_a_dout[31];
                     frame_type <= 2'd1;
+                    last_sel   <= 1'b0;
                 end else if (!fifo_b_empty) begin
                     rd_en_b    <= 1'b1;
-                    tx_shift   <= fifo_b_dout;
+                    tx_shift   <= {fifo_b_dout[30:0], 1'b0};
                     data_out   <= fifo_b_dout[31];
                     frame_type <= 2'd2;
+                    last_sel   <= 1'b1;
                 end else begin
-                    tx_shift   <= IDLE_FRAME;
+                    tx_shift   <= {IDLE_FRAME[30:0], 1'b0};
                     data_out   <= IDLE_FRAME[31];
                     frame_type <= 2'd0;
                 end
                 tx_bit_cnt <= 6'd31;
             end else begin
-                data_out   <= tx_shift[30];
+                data_out   <= tx_shift[31];
                 tx_shift   <= {tx_shift[30:0], 1'b0};
                 tx_bit_cnt <= tx_bit_cnt - 1'b1;
             end
