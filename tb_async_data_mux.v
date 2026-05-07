@@ -124,6 +124,8 @@ module tb_async_data_mux;
             $display("TEST FAILED: frame loss detected");
             $finish_and_return(1);
         end
+        // 0x017DD52A = 0x112233+0x445566+0x778899+0xABCDEF+0x010203+0x040506
+        // 0x0499DB5A = 0x102030+0x405060+0x708090+0xA0B0C0+0xD0E0F0+0x123456+0x654321+0xDEADBE+0xEF0011+0x223344
         if (sum_a_payload != 32'h017D_D52A || sum_b_payload != 32'h0499_DB5A) begin
             $display("TEST FAILED: payload mismatch");
             $finish_and_return(1);

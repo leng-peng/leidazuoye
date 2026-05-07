@@ -104,7 +104,7 @@ module async_data_mux (
         if (!rst_n) begin
             rd_en_a   <= 1'b0;
             rd_en_b   <= 1'b0;
-            tx_shift  <= {IDLE_FRAME[30:0], 1'b0};
+            tx_shift  <= IDLE_FRAME;
             tx_bit_cnt <= 6'd0;
             data_out  <= 1'b0;
             frame_type <= 2'd0;
